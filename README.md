@@ -46,14 +46,3 @@ and compute your score.
 
 Note that your submission .csv file must have the columns "Id" and "bike_log_count",
 and be of the same length as `final_test.parquet`.
-blablab
-kgkrgjl``
-fhiuhe
-Coucou Malo :))))
-Malo répond
-encore toi Malo
-test 
-test compréhensions encore
-dernier normal
-encore un
-aller aller 
