@@ -49,7 +49,7 @@ model.fit(X_train, y_train)
 
 y_pred = model.predict(X_test)
 
-csv_submission = pd.DataFrame({'Id': X_test.index,
-                               'log_bike_count': y_pred})
+submission = pd.DataFrame({'Id': X_test.index,
+                           'log_bike_count': y_pred})
 
-csv_submission.to_csv('baseline.csv', index=False)
+submission.to_csv('submission.csv', index=False)
