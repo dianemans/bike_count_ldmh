@@ -12,5 +12,4 @@ skrub
 folium
 holidays
 statsmodels
-bike_count 
-importlib
+xgboost
