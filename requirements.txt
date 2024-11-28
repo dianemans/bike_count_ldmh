@@ -6,3 +6,11 @@ scikit-learn
 folium
 ipython
 jupyterlab
+numpy
+pathlib
+skrub
+folium
+holidays
+statsmodels
+bike_count 
+importlib
