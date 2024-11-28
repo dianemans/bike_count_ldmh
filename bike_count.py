@@ -10,7 +10,7 @@ from xgboost import XGBRegressor
 target_col = 'log_bike_count'
 columns_to_drop = ['bike_count', 'log_bike_count', 'counter_id',
                         'coordinates', 'counter_technical_id',
-                          'counter_installation_date']
+                          'counter_installation_date', 'site_id']
 
 
 
