@@ -2,10 +2,10 @@ import pandas as pd
 import numpy as np
 import holidays
 from pathlib import Path
-from sklearn.preprocessing import FunctionTransformer, OneHotEncoder
+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 
@@ -14,11 +14,11 @@ columns_to_drop = ['bike_count', 'log_bike_count', 'counter_id',
                         'coordinates', 'counter_technical_id',
                           'counter_installation_date', 'site_id']
 
-date_cols = ['month_day', 'week_day', 'year', 'month', 'hour', 'is_weekend', 'is_holiday']
+date_cols = ['month_day', 'week_day', 'year', 'month', 'hour', 'is_weekend', 'is_holiday', 'covid_state']
 
 categorical_cols = ['counter_name', 'site_name']
 
-
+std_cols = ['t']
 
 def covid_period(date):
     confinement_start = pd.Timestamp('2020-10-30')
@@ -95,6 +95,9 @@ def train_test_temporal(X, y, delta='30 days'):
 
 
 def base_pipeline():
+
+    scaler = StandardScaler() 
+
     date_encoder = FunctionTransformer(_encode_date)
 
     categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
@@ -104,6 +107,7 @@ def base_pipeline():
 
     preprocessor = ColumnTransformer(
     [
+        ('scaler', scaler, std_cols),
         ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
         ('cat', categorical_encoder, categorical_cols)
     ]
@@ -115,7 +119,11 @@ def base_pipeline():
 
     return pipe
 
-def rf_tuned_pipeline():
+
+def ridge_pipeline():
+
+    scaler = StandardScaler()
+
     date_encoder = FunctionTransformer(_encode_date)
 
     categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
@@ -125,6 +133,33 @@ def rf_tuned_pipeline():
 
     preprocessor = ColumnTransformer(
     [
+        ('scaler', scaler, std_cols),
+        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
+        ('cat', categorical_encoder, categorical_cols)
+    ]
+    )
+
+    regressor = Ridge()
+
+    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
+
+    return pipe
+
+
+def rf_tuned_pipeline():
+
+    scaler = StandardScaler()
+
+    date_encoder = FunctionTransformer(_encode_date)
+
+    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
+
+    merge = FunctionTransformer(_merge_external_data)
+
+
+    preprocessor = ColumnTransformer(
+    [
+        ('scaler', scaler, std_cols),
         ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
         ('cat', categorical_encoder, categorical_cols)
     ]
@@ -138,6 +173,9 @@ def rf_tuned_pipeline():
 
 
 def xgb_tuned_pipeline():
+
+    scaler = StandardScaler()
+
     date_encoder = FunctionTransformer(_encode_date)
 
     categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
@@ -147,6 +185,7 @@ def xgb_tuned_pipeline():
 
     preprocessor = ColumnTransformer(
     [
+        ('scaler', scaler, std_cols),
         ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
         ('cat', categorical_encoder, categorical_cols)
     ]
