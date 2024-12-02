@@ -1,5 +1,7 @@
 import pandas as pd
+import numpy as np
 import holidays
+from pathlib import Path
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder
 from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer
@@ -12,17 +14,27 @@ columns_to_drop = ['bike_count', 'log_bike_count', 'counter_id',
                         'coordinates', 'counter_technical_id',
                           'counter_installation_date', 'site_id']
 
+date_cols = ['month_day', 'week_day', 'year', 'month', 'hour', 'is_weekend', 'is_holiday']
+
+categorical_cols = ['counter_name', 'site_name']
 
 
-def _get_season(month):
-    if month in [12, 1, 2]:
-        return 'winter'
-    if month in [3, 4, 5]:
-        return 'spring'
-    if month in [6, 7, 8]:
-        return 'summer'
+
+def covid_period(date):
+    confinement_start = pd.Timestamp('2020-10-30')
+    confinement_end = pd.Timestamp('2020-12-15')
+    couvre_feu_1_start = pd.Timestamp('2020-12-15')
+    couvre_feu_1_end = pd.Timestamp('2021-01-15')
+    couvre_feu_2_start = pd.Timestamp('2021-01-16')
+    couvre_feu_2_end = pd.Timestamp('2021-06-20')
+    if confinement_start <= date <= confinement_end:
+        return 1  # lockdown
+    elif couvre_feu_1_start <= date <= couvre_feu_1_end:
+        return 2  # first curfew
+    elif couvre_feu_2_start <= date <= couvre_feu_2_end:
+        return 3  # second curfew
     else:
-        return 'fall'
+        return 0
 
 
 def _encode_date(date):
@@ -33,16 +45,33 @@ def _encode_date(date):
     date['month'] = date['date'].dt.month
     date['hour'] = date['date'].dt.hour
     date['is_weekend'] = (date['week_day'] >= 6).astype(int)
-    date['season'] = date['month'].apply(_get_season)
     years = date['year'].drop_duplicates().values.tolist()
     french_holidays = set(holidays.country_holidays('FR', years=years))
     date['is_holiday'] = (date['date']
                         .dt.date
                         .isin(french_holidays)
-                        .astype(int)
-    )
+                        .astype(int))
+    date['covid_state'] = date['date'].apply(covid_period)
 
     return date.drop(columns= 'date')
+
+def _merge_external_data(X):
+    file_path = Path(__file__).parent / "external_data//external_data.csv"
+
+    df_ext = pd.read_csv(file_path, parse_dates=["date"])
+    df_ext['date'] = pd.to_datetime(df_ext['date']).astype('datetime64[us]')
+
+
+    X = X.copy()
+    # When using merge_asof left frame need to be sorted
+    X["orig_index"] = np.arange(X.shape[0])
+    X = pd.merge_asof(
+        X.sort_values("date"), df_ext[["date", "t"]].sort_values("date"), on="date"
+    )
+    # Sort back to the original order
+    X = X.sort_values("orig_index")
+    del X["orig_index"]
+    return X
 
 
 def get_model_data(path='data/train.parquet'):
@@ -67,10 +96,11 @@ def train_test_temporal(X, y, delta='30 days'):
 
 def base_pipeline():
     date_encoder = FunctionTransformer(_encode_date)
-    date_cols = ['month_day', 'week_day', 'year', 'month', 'hour', 'is_weekend', 'season', 'is_holiday']
 
     categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
-    categorical_cols = ['counter_name', 'site_name']
+
+    merge = FunctionTransformer(_merge_external_data)
+
 
     preprocessor = ColumnTransformer(
     [
@@ -81,16 +111,17 @@ def base_pipeline():
 
     regressor = LinearRegression()
 
-    pipe = make_pipeline(date_encoder, preprocessor, regressor)
+    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
     return pipe
 
 def rf_tuned_pipeline():
     date_encoder = FunctionTransformer(_encode_date)
-    date_cols = ['month_day', 'week_day', 'year', 'month', 'hour', 'is_weekend', 'season', 'is_holiday']
 
     categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
-    categorical_cols = ['counter_name', 'site_name']
+
+    merge = FunctionTransformer(_merge_external_data)
+
 
     preprocessor = ColumnTransformer(
     [
@@ -101,17 +132,18 @@ def rf_tuned_pipeline():
 
     regressor = RandomForestRegressor(max_depth=20, n_jobs=-1)
 
-    pipe = make_pipeline(date_encoder, preprocessor, regressor)
+    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
     return pipe
 
 
 def xgb_tuned_pipeline():
     date_encoder = FunctionTransformer(_encode_date)
-    date_cols = ['month_day', 'week_day', 'year', 'month', 'hour', 'is_weekend', 'season', 'is_holiday']
 
     categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
-    categorical_cols = ['counter_name', 'site_name']
+
+    merge = FunctionTransformer(_merge_external_data)
+
 
     preprocessor = ColumnTransformer(
     [
@@ -133,6 +165,6 @@ def xgb_tuned_pipeline():
     tree_method='hist'
 )
 
-    pipe = make_pipeline(date_encoder, preprocessor, regressor)
+    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
     return pipe
