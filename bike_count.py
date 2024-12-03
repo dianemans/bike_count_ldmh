@@ -7,7 +7,10 @@ from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
+from flaml import AutoML
 from xgboost import XGBRegressor
+from prophet import Prophet
+
 
 target_col = 'log_bike_count'
 columns_to_drop = ['bike_count', 'log_bike_count', 'counter_id',
@@ -205,5 +208,30 @@ def xgb_tuned_pipeline():
 )
 
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
+
+    return pipe
+
+
+
+def preprocess_pipeline():
+
+    scaler = StandardScaler()
+
+    date_encoder = FunctionTransformer(_encode_date)
+
+    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
+
+    merge = FunctionTransformer(_merge_external_data)
+
+
+    preprocessor = ColumnTransformer(
+    [
+        ('scaler', scaler, std_cols),
+        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
+        ('cat', categorical_encoder, categorical_cols)
+    ]
+    )
+
+    pipe = make_pipeline(merge, date_encoder, preprocessor)
 
     return pipe
