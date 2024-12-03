@@ -103,7 +103,7 @@ def base_pipeline():
 
     date_encoder = FunctionTransformer(_encode_date)
 
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
+    categorical_encoder = OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist')
 
     merge = FunctionTransformer(_merge_external_data)
 
@@ -111,7 +111,7 @@ def base_pipeline():
     preprocessor = ColumnTransformer(
     [
         ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
+        ('date', OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist'), date_cols),
         ('cat', categorical_encoder, categorical_cols)
     ]
     )
@@ -129,7 +129,7 @@ def ridge_pipeline():
 
     date_encoder = FunctionTransformer(_encode_date)
 
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
+    categorical_encoder = OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist')
 
     merge = FunctionTransformer(_merge_external_data)
 
@@ -137,7 +137,7 @@ def ridge_pipeline():
     preprocessor = ColumnTransformer(
     [
         ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
+        ('date', OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist'), date_cols),
         ('cat', categorical_encoder, categorical_cols)
     ]
     )
@@ -155,7 +155,7 @@ def rf_tuned_pipeline():
 
     date_encoder = FunctionTransformer(_encode_date)
 
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
+    categorical_encoder = OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist')
 
     merge = FunctionTransformer(_merge_external_data)
 
@@ -163,7 +163,7 @@ def rf_tuned_pipeline():
     preprocessor = ColumnTransformer(
     [
         ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
+        ('date', OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist'), date_cols),
         ('cat', categorical_encoder, categorical_cols)
     ]
     )
@@ -181,7 +181,7 @@ def xgb_tuned_pipeline():
 
     date_encoder = FunctionTransformer(_encode_date)
 
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
+    categorical_encoder = OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist')
 
     merge = FunctionTransformer(_merge_external_data)
 
@@ -189,7 +189,7 @@ def xgb_tuned_pipeline():
     preprocessor = ColumnTransformer(
     [
         ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
+        ('date', OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist'), date_cols),
         ('cat', categorical_encoder, categorical_cols)
     ]
     )
@@ -205,12 +205,11 @@ def xgb_tuned_pipeline():
     reg_alpha=0,
     random_state=42,
     tree_method='hist'
-)
+    )
 
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
     return pipe
-
 
 
 def preprocess_pipeline():
@@ -219,7 +218,7 @@ def preprocess_pipeline():
 
     date_encoder = FunctionTransformer(_encode_date)
 
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
+    categorical_encoder = OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist')
 
     merge = FunctionTransformer(_merge_external_data)
 
@@ -227,7 +226,7 @@ def preprocess_pipeline():
     preprocessor = ColumnTransformer(
     [
         ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
+        ('date', OneHotEncoder(drop='first', handle_unknown='infrequent_if_exist'), date_cols),
         ('cat', categorical_encoder, categorical_cols)
     ]
     )
