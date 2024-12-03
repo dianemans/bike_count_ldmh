@@ -160,7 +160,7 @@ def xgb_tuned_pipeline():
     reg_alpha=0,
     random_state=42,
     tree_method='hist'
-)
+    )
 
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
