@@ -13,15 +13,18 @@ from prophet import Prophet
 
 
 target_col = 'log_bike_count'
-columns_to_drop = ['bike_count', 'log_bike_count', 'counter_id',
-                        'coordinates', 'counter_technical_id',
-                          'counter_installation_date', 'site_id']
 
-date_cols = ['month_day', 'week_day', 'year', 'month', 'hour', 'is_weekend', 'is_holiday', 'covid_state']
+columns_to_drop = ['bike_count', 'log_bike_count', 'counter_id', 'coordinates',
+                   'counter_technical_id', 'counter_installation_date', 'site_id']
 
-categorical_cols = ['counter_name', 'site_name']
+date_cols = ['week_day', 'year', 'month', 'hour', 'is_holiday', 'covid_state', 'month_day', 'is_weekend'] 
+
+categorical_cols = ['counter_name'] # J'enleve site_name 
 
 std_cols = ['t']
+
+
+## Utils ##
 
 def covid_period(date):
     confinement_start = pd.Timestamp('2020-10-30')
@@ -40,7 +43,7 @@ def covid_period(date):
         return 0
 
 
-def _encode_date(date):
+def _encode_date(date): 
     date = date.copy()
     date['month_day'] = date['date'].dt.day
     date['week_day'] = date['date'].dt.day_of_week + 1
@@ -64,14 +67,11 @@ def _merge_external_data(X):
     df_ext = pd.read_csv(file_path, parse_dates=["date"])
     df_ext['date'] = pd.to_datetime(df_ext['date']).astype('datetime64[us]')
 
-
     X = X.copy()
-    # When using merge_asof left frame need to be sorted
     X["orig_index"] = np.arange(X.shape[0])
     X = pd.merge_asof(
-        X.sort_values("date"), df_ext[["date", "t"]].sort_values("date"), on="date"
+        X.sort_values("date"), df_ext[["date", "t"]].sort_values("date"), on="date", direction='nearest',
     )
-    # Sort back to the original order
     X = X.sort_values("orig_index")
     del X["orig_index"]
     return X
@@ -97,102 +97,57 @@ def train_test_temporal(X, y, delta='30 days'):
     return X_train, X_valid, y_train, y_valid
 
 
+
+###############################################################################################################################
+################################################## PIPELINE  CONSTRUCTION #####################################################
+###############################################################################################################################
+
+## Pipeline Components ##
+
+scaler = StandardScaler() 
+
+date_encoder = FunctionTransformer(_encode_date)
+
+categorical_encoder = OneHotEncoder(handle_unknown='error')
+
+merge = FunctionTransformer(_merge_external_data)
+
+preprocessor = ColumnTransformer(
+[
+    ('scaler', scaler, std_cols),
+    ('date', OneHotEncoder(handle_unknown='error'), date_cols),
+    ('cat', categorical_encoder, categorical_cols)
+]
+)
+
+## Pipelines ## 
+
+# Linear Regression
 def base_pipeline():
 
-    scaler = StandardScaler() 
-
-    date_encoder = FunctionTransformer(_encode_date)
-
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
-
-    merge = FunctionTransformer(_merge_external_data)
-
-
-    preprocessor = ColumnTransformer(
-    [
-        ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
-        ('cat', categorical_encoder, categorical_cols)
-    ]
-    )
-
     regressor = LinearRegression()
-
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
     return pipe
 
-
+# Ridge
 def ridge_pipeline():
 
-    scaler = StandardScaler()
-
-    date_encoder = FunctionTransformer(_encode_date)
-
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
-
-    merge = FunctionTransformer(_merge_external_data)
-
-
-    preprocessor = ColumnTransformer(
-    [
-        ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
-        ('cat', categorical_encoder, categorical_cols)
-    ]
-    )
-
     regressor = Ridge()
-
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
     return pipe
 
-
+# Random Forest
 def rf_tuned_pipeline():
 
-    scaler = StandardScaler()
-
-    date_encoder = FunctionTransformer(_encode_date)
-
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
-
-    merge = FunctionTransformer(_merge_external_data)
-
-
-    preprocessor = ColumnTransformer(
-    [
-        ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
-        ('cat', categorical_encoder, categorical_cols)
-    ]
-    )
-
     regressor = RandomForestRegressor(max_depth=20, n_jobs=-1)
-
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
     return pipe
 
-
+# XGBoost
 def xgb_tuned_pipeline():
-
-    scaler = StandardScaler()
-
-    date_encoder = FunctionTransformer(_encode_date)
-
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
-
-    merge = FunctionTransformer(_merge_external_data)
-
-
-    preprocessor = ColumnTransformer(
-    [
-        ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
-        ('cat', categorical_encoder, categorical_cols)
-    ]
-    )
 
     regressor = XGBRegressor(
     learning_rate=0.1,
@@ -212,25 +167,8 @@ def xgb_tuned_pipeline():
     return pipe
 
 
-
+# Preprocessing Pipeline
 def preprocess_pipeline():
-
-    scaler = StandardScaler()
-
-    date_encoder = FunctionTransformer(_encode_date)
-
-    categorical_encoder = OneHotEncoder(handle_unknown='infrequent_if_exist')
-
-    merge = FunctionTransformer(_merge_external_data)
-
-
-    preprocessor = ColumnTransformer(
-    [
-        ('scaler', scaler, std_cols),
-        ('date', OneHotEncoder(handle_unknown='infrequent_if_exist'), date_cols),
-        ('cat', categorical_encoder, categorical_cols)
-    ]
-    )
 
     pipe = make_pipeline(merge, date_encoder, preprocessor)
 
