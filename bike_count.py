@@ -7,6 +7,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV
 from flaml import AutoML
 from xgboost import XGBRegressor
 from prophet import Prophet
@@ -14,12 +15,13 @@ from prophet import Prophet
 
 target_col = 'log_bike_count'
 
-columns_to_drop = ['bike_count', 'log_bike_count', 'counter_id', 'coordinates',
-                   'counter_technical_id', 'counter_installation_date', 'site_id']
-
+#columns_to_drop = ['counter_id', 'coordinates', 'counter_technical_id', 'counter_installation_date', 
+#                   'site_id', 'site_name', 'latitude', 'longitude']
+# garder en tete 'latitude', 'longitude'
+columns_to_drop = ['coordinates', 'counter_id', 'site_id', 'counter_installation_date']
 date_cols = ['week_day', 'year', 'month', 'hour', 'is_holiday', 'covid_state', 'month_day', 'is_weekend'] 
 
-categorical_cols = ['counter_name'] # J'enleve site_name 
+categorical_cols = ['counter_name', 'site_name', 'counter_technical_id'] 
 
 std_cols = ['t']
 
@@ -85,7 +87,7 @@ def get_model_data(path='data/train.parquet'):
     data = pd.read_parquet(path)
     data.sort_values(['date', 'counter_name'], inplace=True)
     y = data[target_col].values
-    X = data.drop(columns_to_drop, axis=1)
+    X = data.drop(['bike_count', target_col], axis=1)
 
     return X, y
 
@@ -122,9 +124,10 @@ merge = FunctionTransformer(_merge_external_data)
 # Preprocessing steps
 preprocessor = ColumnTransformer(
 [
+    ('drop_cols', 'drop', columns_to_drop),
     ('scaler', scaler, std_cols),
     ('date', OneHotEncoder(handle_unknown='error'), date_cols),
-    ('cat', categorical_encoder, categorical_cols)
+    ('cat', categorical_encoder, categorical_cols),
 ]
 )
 
@@ -178,15 +181,19 @@ def preprocess_pipeline():
 #Pipeline sans external data
 
 def xgboost_tuned_pipeline_no_merge():
-    regressor = XGBRegressor(
+
+    preprocessor = ColumnTransformer(
+    [
+        ('drop_cols', 'drop', columns_to_drop),
+        ('date', OneHotEncoder(handle_unknown='error'), date_cols),
+        ('cat', categorical_encoder, categorical_cols),
+    ]
+    )
+    
+    regressor = XGBRegressor( # Modele réduit
     learning_rate=0.1,
     n_estimators=100,
     max_depth=10,
-    min_child_weight=1,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    reg_lambda=1,
-    reg_alpha=0,
     random_state=42,
     tree_method='hist'
     )
