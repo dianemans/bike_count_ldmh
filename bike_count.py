@@ -7,7 +7,6 @@ from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import GridSearchCV
 from flaml import AutoML
 from xgboost import XGBRegressor
 from prophet import Prophet
@@ -25,7 +24,10 @@ categorical_cols = ['counter_name'] # J'enleve site_name
 std_cols = ['t']
 
 
-## Utils ##
+###############################################################################################################################
+########################################################### UTILS #############################################################
+###############################################################################################################################
+
 
 def covid_period(date):
     confinement_start = pd.Timestamp('2020-10-30')
@@ -105,14 +107,19 @@ def train_test_temporal(X, y, delta='30 days'):
 
 ## Pipeline Components ##
 
+# Scaler
 scaler = StandardScaler() 
 
+# Date Encoding 
 date_encoder = FunctionTransformer(_encode_date)
 
+# Categorical Encoding 
 categorical_encoder = OneHotEncoder(handle_unknown='error')
 
+# Merging Meteorological Data
 merge = FunctionTransformer(_merge_external_data)
 
+# Preprocessing steps
 preprocessor = ColumnTransformer(
 [
     ('scaler', scaler, std_cols),
@@ -121,39 +128,34 @@ preprocessor = ColumnTransformer(
 ]
 )
 
-## Pipelines ## 
+
+        ### Pipelines ###
+
 
 # Linear Regression
 def base_pipeline():
-
     regressor = LinearRegression()
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
-
     return pipe
 
 # Ridge
 def ridge_pipeline():
-
     regressor = Ridge()
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
-
     return pipe
 
 # Random Forest
 def rf_tuned_pipeline():
-
     regressor = RandomForestRegressor(max_depth=20, n_jobs=-1)
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
-
     return pipe
 
 # XGBoost
 def xgb_tuned_pipeline():
-
     regressor = XGBRegressor(
     learning_rate=0.1,
     n_estimators=100,
-    max_depth=6,
+    max_depth=10,
     min_child_weight=1,
     subsample=0.8,
     colsample_bytree=0.8,
@@ -162,47 +164,31 @@ def xgb_tuned_pipeline():
     random_state=42,
     tree_method='hist'
     )
-
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
 
     return pipe
 
-# Grid Search XGBoost
-param_grid = {
-    'xgbregressor__learning_rate': [0.01, 0.1, 0.2],
-    'xgbregressor__n_estimators': [100, 200, 300],
-    'xgbregressor__max_depth': [4, 6, 8],
-    'xgbregressor__min_child_weight': [1, 3, 5],
-    'xgbregressor__subsample': [0.6, 0.8, 1.0],
-    'xgbregressor__colsample_bytree': [0.6, 0.8, 1.0],
-}
-
-def GS_xgb_pipeline():
-    
-    regressor = XGBRegressor(
-        random_state=42,
-        tree_method='hist'  # Utilisation du "histogram method" pour accélérer
-    )
-    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
-    return pipe
-
-# Définir le GridSearchCV
-def grid_search(pipe):
-    
-    grid_search = GridSearchCV(
-        estimator=pipe,
-        param_grid=param_grid,
-        scoring='neg_root_mean_squared_error',
-        cv=5,
-        verbose=2,
-        n_jobs=-1  
-    )
-
-    return grid_search
 
 # Preprocessing Pipeline
 def preprocess_pipeline():
-
     pipe = make_pipeline(merge, date_encoder, preprocessor)
+    return pipe
 
+
+#Pipeline sans external data
+
+def xgboost_tuned_pipeline_no_merge():
+    regressor = XGBRegressor(
+    learning_rate=0.1,
+    n_estimators=100,
+    max_depth=10,
+    min_child_weight=1,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    reg_lambda=1,
+    reg_alpha=0,
+    random_state=42,
+    tree_method='hist'
+    )
+    pipe = make_pipeline(date_encoder, preprocessor, regressor)
     return pipe
