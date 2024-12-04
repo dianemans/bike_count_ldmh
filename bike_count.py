@@ -192,3 +192,36 @@ def xgboost_tuned_pipeline_no_merge():
     )
     pipe = make_pipeline(date_encoder, preprocessor, regressor)
     return pipe
+
+# Grid Search XGBoost
+param_grid = {
+    'xgbregressor__learning_rate': [0.01, 0.1, 0.2],
+    'xgbregressor__n_estimators': [100, 200, 300],
+    'xgbregressor__max_depth': [4, 6, 8],
+    'xgbregressor__min_child_weight': [1, 3, 5],
+    'xgbregressor__subsample': [0.6, 0.8, 1.0],
+    'xgbregressor__colsample_bytree': [0.6, 0.8, 1.0],
+}
+
+def GS_xgb_pipeline():
+    
+    regressor = XGBRegressor(
+        random_state=42,
+        tree_method='hist'  # Utilisation du "histogram method" pour accélérer
+    )
+    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
+    return pipe
+
+# Définir le GridSearchCV
+def grid_search(pipe):
+    
+    grid_search = GridSearchCV(
+        estimator=pipe,
+        param_grid=param_grid,
+        scoring='neg_root_mean_squared_error',
+        cv=5,
+        verbose=2,
+        n_jobs=-1  
+    )
+
+    return grid_search
