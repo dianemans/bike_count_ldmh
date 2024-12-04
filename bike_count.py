@@ -71,11 +71,12 @@ def _merge_external_data(X):
 
     df_ext = pd.read_csv(file_path, parse_dates=["date"])
     df_ext['date'] = pd.to_datetime(df_ext['date']).astype('datetime64[us]')
+    print(df_ext)
 
     X = X.copy()
     X["orig_index"] = np.arange(X.shape[0])
     X = pd.merge_asof(
-        X.sort_values("date"), df_ext[["date", "t"]].sort_values("date"), on="date", direction='nearest',
+        X.sort_values("date"), df_ext[df_ext.columns.tolist()].sort_values("date"), on="date", direction='nearest',
     )
     X = X.sort_values("orig_index")
     del X["orig_index"]
