@@ -19,9 +19,10 @@ target_col = 'log_bike_count'
 #                   'site_id', 'site_name', 'latitude', 'longitude']
 # garder en tete 'latitude', 'longitude'
 columns_to_drop = ['coordinates', 'counter_id', 'site_id', 'counter_installation_date']
-date_cols = ['week_day', 'year', 'month', 'hour', 'is_holiday', 'covid_state', 'month_day', 'is_weekend'] 
+# J'ai drop latitude et longitude aussi
+date_cols = ['week_day', 'year', 'month', 'hour', 'is_holiday', 'covid_state', 'month_day'] 
 
-categorical_cols = ['counter_name', 'site_name', 'counter_technical_id'] 
+categorical_cols = ['counter_name', 'counter_technical_id', 'site_name'] 
 
 std_cols = ['t']
 
@@ -48,23 +49,24 @@ def covid_period(date):
         return 0
 
 
-def _encode_date(date): 
-    date = date.copy()
-    date['month_day'] = date['date'].dt.day
-    date['week_day'] = date['date'].dt.day_of_week + 1
-    date['year'] = date['date'].dt.year
-    date['month'] = date['date'].dt.month
-    date['hour'] = date['date'].dt.hour
-    date['is_weekend'] = (date['week_day'] >= 6).astype(int)
-    years = date['year'].drop_duplicates().values.tolist()
+def _encode_date(X): 
+    X = X.copy()
+    X['month_day'] = X['date'].dt.day
+    X['week_day'] = X['date'].dt.day_of_week + 1
+    X['year'] = X['date'].dt.year
+    X['month'] = X['date'].dt.month
+    X['hour'] = X['date'].dt.hour
+    #X['is_weekend'] = (X['week_day'] >= 6).astype(int)
+    years = X['year'].drop_duplicates().values.tolist()
     french_holidays = set(holidays.country_holidays('FR', years=years))
-    date['is_holiday'] = (date['date']
+    X['is_holiday'] = (X['date']
                         .dt.date
                         .isin(french_holidays)
                         .astype(int))
-    date['covid_state'] = date['date'].apply(covid_period)
+    X['covid_state'] = X['date'].apply(covid_period)
 
-    return date.drop(columns= 'date')
+    X = X.drop(columns=['date'])
+    return X
 
 def _merge_external_data(X):
     file_path = Path(__file__).parent / "external_data//external_data.csv"
@@ -128,61 +130,29 @@ preprocessor = ColumnTransformer(
     ('scaler', scaler, std_cols),
     ('date', OneHotEncoder(handle_unknown='error'), date_cols),
     ('cat', categorical_encoder, categorical_cols),
-]
+], 
+remainder='passthrough'
 )
 
 
         ### Pipelines ###
 
 
-# Linear Regression
-def base_pipeline():
-    regressor = LinearRegression()
-    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
-    return pipe
-
-# Ridge
-def ridge_pipeline():
-    regressor = Ridge()
-    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
-    return pipe
-
-# Random Forest
-def rf_tuned_pipeline():
-    regressor = RandomForestRegressor(max_depth=20, n_jobs=-1)
-    pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
-    return pipe
-
 # XGBoost
 def xgb_tuned_pipeline():
-    regressor = XGBRegressor(
-    learning_rate=0.1,
-    n_estimators=100,
-    max_depth=10,
-    min_child_weight=1,
-    subsample=0.8,
-    colsample_bytree=0.8,
-    reg_lambda=1,
-    reg_alpha=0,
-    random_state=42,
-    tree_method='hist'
-    )
+    regressor = XGBRegressor(learning_rate=0.1, n_estimators=100, max_depth=10, min_child_weight=1,
+                             subsample=0.8, colsample_bytree=0.8, reg_lambda=1, reg_alpha=0,
+                             random_state=42, tree_method='hist')
+    
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
-
-    return pipe
-
-
-# Preprocessing Pipeline
-def preprocess_pipeline():
-    pipe = make_pipeline(merge, date_encoder, preprocessor)
     return pipe
 
 
 #Pipeline sans external data
 
-def xgboost_tuned_pipeline_no_merge():
+def xgb_tuned_pipeline_no_merge():
 
-    preprocessor = ColumnTransformer(
+    preprocessor1 = ColumnTransformer(
     [
         ('drop_cols', 'drop', columns_to_drop),
         ('date', OneHotEncoder(handle_unknown='error'), date_cols),
@@ -197,8 +167,37 @@ def xgboost_tuned_pipeline_no_merge():
     random_state=42,
     tree_method='hist'
     )
-    pipe = make_pipeline(date_encoder, preprocessor, regressor)
+    pipe = make_pipeline(date_encoder, preprocessor1, regressor)
     return pipe
+
+
+def xgb_no_encoding():
+    preprocessor2 = ColumnTransformer(
+    [
+        ('drop_cols', 'drop', columns_to_drop),
+        #('date', OneHotEncoder(handle_unknown='error'), date_cols), ENCODER LA DATE CA FUCK UP JSP PpPPpPoURqUOIiiIiI
+        ('cat', categorical_encoder, categorical_cols)
+    ],
+    remainder='passthrough'
+    )
+    
+    regressor = XGBRegressor( # Modele réduit
+    learning_rate=0.1,
+    n_estimators=100,
+    max_depth=10,
+    random_state=42,
+    tree_method='hist', 
+    enable_categorical=True
+    )
+    pipe = make_pipeline(date_encoder, preprocessor2, regressor)
+    return pipe
+
+
+
+###############################################################################################################################
+##################################################### GRID SEARCH #############################################################
+###############################################################################################################################
+
 
 # Grid Search XGBoost
 param_grid = {
