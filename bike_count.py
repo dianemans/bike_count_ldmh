@@ -10,19 +10,16 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GridSearchCV
 from flaml import AutoML
 from xgboost import XGBRegressor
-from prophet import Prophet
-
+from skrub import TableVectorizer, DatetimeEncoder
 
 target_col = 'log_bike_count'
 
-#columns_to_drop = ['counter_id', 'coordinates', 'counter_technical_id', 'counter_installation_date', 
-#                   'site_id', 'site_name', 'latitude', 'longitude']
-# garder en tete 'latitude', 'longitude'
-columns_to_drop = ['coordinates', 'counter_id', 'site_id', 'counter_installation_date']
-# J'ai drop latitude et longitude aussi
+
+columns_to_drop = ['coordinates', 'counter_id', 'site_id', 'site_name', 'counter_technical_id']#, 'counter_installation_date']
+# a mediter pour latitude et longitude
 date_cols = ['week_day', 'year', 'month', 'hour', 'is_holiday', 'covid_state', 'month_day'] 
 
-categorical_cols = ['counter_name', 'counter_technical_id', 'site_name'] 
+categorical_cols = ['counter_name']#, 'counter_technical_id', 'site_name'] 
 
 std_cols = ['t']
 
@@ -109,7 +106,8 @@ def train_test_temporal(X, y, delta='30 days'):
 ################################################## PIPELINE  CONSTRUCTION #####################################################
 ###############################################################################################################################
 
-## Pipeline Components ##
+
+#################################################  Pipeline Components   ######################################################
 
 # Scaler
 scaler = StandardScaler() 
@@ -135,7 +133,7 @@ remainder='passthrough'
 )
 
 
-        ### Pipelines ###
+#################################################      Pipelines        ######################################################
 
 
 # XGBoost
@@ -175,7 +173,6 @@ def xgb_no_encoding():
     preprocessor2 = ColumnTransformer(
     [
         ('drop_cols', 'drop', columns_to_drop),
-        #('date', OneHotEncoder(handle_unknown='error'), date_cols), ENCODER LA DATE CA FUCK UP JSP PpPPpPoURqUOIiiIiI
         ('cat', categorical_encoder, categorical_cols)
     ],
     remainder='passthrough'
@@ -192,7 +189,55 @@ def xgb_no_encoding():
     pipe = make_pipeline(date_encoder, preprocessor2, regressor)
     return pipe
 
+def xgb_table_vectorized(): # best pipeline yet
 
+    drop_cols = ColumnTransformer(
+        [
+            ('drop_cols', 'drop', columns_to_drop)
+        ],
+        remainder='passthrough'
+    )
+
+    regressor = XGBRegressor( # Modele réduit
+    learning_rate=0.1,
+    n_estimators=100,
+    max_depth=10,
+    random_state=42,
+    tree_method='hist', 
+    enable_categorical=True
+    )
+
+    pipe = make_pipeline(date_encoder, drop_cols, TableVectorizer(), regressor)
+
+    return pipe
+
+
+def xgb_vectorized_no_date_encoding(): # best pipeline yet
+
+    drop_cols = ColumnTransformer(
+        [
+            ('drop_cols', 'drop', columns_to_drop)
+        ],
+        remainder='passthrough'
+    )
+
+    table_vectorizer = TableVectorizer(
+        datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
+        n_jobs=-1
+    )
+
+    regressor = XGBRegressor( # Modele réduit
+    learning_rate=0.1,
+    n_estimators=100,
+    max_depth=10,
+    random_state=42,
+    tree_method='hist', 
+    enable_categorical=True
+    )
+
+    pipe = make_pipeline(date_encoder, drop_cols, table_vectorizer, regressor)
+
+    return pipe
 
 ###############################################################################################################################
 ##################################################### GRID SEARCH #############################################################
