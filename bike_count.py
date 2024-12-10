@@ -15,14 +15,29 @@ import optuna
 from vacances_scolaires_france import SchoolHolidayDates
 
 
+'''RESUMÉ DE CE QUI MARCHE LE MIEUX
+
+best pipeline: 
+- Merge avec le dataset externe de météo, en incluant les tendances de pression atmosphérique, la pression, 
+et les données de pluie sur les dernières 24, 12, et 3 heures. 
+- Encoder les dates et utiliser le table vectorizer pour automatiquement preprocess les données de la bonne manière
+- XGBoost (non tuné encore)
+
+A PRENDRE EN COMPTE: 
+- Potentiellement log-trasnform les données de pluie (en trouvant un moyen d'incorporer tout de meme les données = 0)
+- Drop les coordonnées n'a diminué la perf du modèle que de 0.0001, donc autant dire qu'on peut considérer que c'est mieux sans.
+- Ajouter site_name: 
+'''
+
+
 target_col = 'log_bike_count'
 
 
-columns_to_drop = ['coordinates', 'counter_id', 'site_id', 'site_name', 'counter_technical_id']#, 'counter_installation_date']
-# a mediter pour latitude et longitude
+columns_to_drop = ['coordinates', 'counter_id', 'site_id', 'site_name','counter_technical_id', 'latitude', 'longitude'] #, site_name]
+# JESSAYE DE DROP LATI ET LONGI
 date_cols = ['week_day', 'year', 'month', 'hour', 'is_holiday', 'covid_state', 'month_day', 'is_school_holiday'] 
 
-categorical_cols = ['counter_name']#, 'counter_technical_id', 'site_name'] 
+categorical_cols = ['counter_name'] #, 'counter_technical_id', 'site_name'] 
 
 std_cols = ['t']
 
@@ -58,7 +73,7 @@ def _encode_date(X):
     X['year'] = X['date'].dt.year
     X['month'] = X['date'].dt.month
     X['hour'] = X['date'].dt.hour
-    #X['is_weekend'] = (X['week_day'] >= 6).astype(int)
+    #X['is_weekend'] = (X['week_day'] >= 6).astype(int) 
     years = X['year'].drop_duplicates().values.tolist()
     french_holidays = set(holidays.country_holidays('FR', years=years))
     X['is_holiday'] = (X['date']
