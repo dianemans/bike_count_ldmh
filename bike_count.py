@@ -87,11 +87,11 @@ def _merge_external_data(X):
     X = X.copy()
     X["orig_index"] = np.arange(X.shape[0])
     X = pd.merge_asof(
-        X.sort_values("date"), df_ext[["date", "t"]].sort_values("date"), on="date", direction='nearest',
+        X.sort_values("date"), df_ext[["date", 'pres', 'tend', 'rr24', 'rr12', 'rr3']].sort_values("date"), on="date", direction='nearest',
     )
     X = X.sort_values("orig_index")
     del X["orig_index"]
-    return X
+    return X ## better with 'pres' + 'tend' + 'rr24' + 'rr12' + 'rr3'
 
 
 def get_model_data(path='data/train.parquet'):
@@ -248,7 +248,7 @@ def xgb_vectorized_no_date_encoding(): # best pipeline yet
     enable_categorical=True
     )
 
-    pipe = make_pipeline(date_encoder, drop_cols, table_vectorizer, regressor)
+    pipe = make_pipeline(merge, date_encoder, drop_cols, table_vectorizer, regressor) # ADDED MERGE
 
     return pipe
 
