@@ -11,13 +11,16 @@ from sklearn.model_selection import GridSearchCV
 from flaml import AutoML
 from xgboost import XGBRegressor
 from skrub import TableVectorizer, DatetimeEncoder
+import optuna 
+from vacances_scolaires_france import SchoolHolidayDates
+
 
 target_col = 'log_bike_count'
 
 
 columns_to_drop = ['coordinates', 'counter_id', 'site_id', 'site_name', 'counter_technical_id']#, 'counter_installation_date']
 # a mediter pour latitude et longitude
-date_cols = ['week_day', 'year', 'month', 'hour', 'is_holiday', 'covid_state', 'month_day'] 
+date_cols = ['week_day', 'year', 'month', 'hour', 'is_holiday', 'covid_state', 'month_day', 'is_school_holiday'] 
 
 categorical_cols = ['counter_name']#, 'counter_technical_id', 'site_name'] 
 
@@ -45,6 +48,8 @@ def covid_period(date):
     else:
         return 0
 
+school_holidays = SchoolHolidayDates()
+
 
 def _encode_date(X): 
     X = X.copy()
@@ -61,6 +66,14 @@ def _encode_date(X):
                         .isin(french_holidays)
                         .astype(int))
     X['covid_state'] = X['date'].apply(covid_period)
+    years = X['date'].dt.year.unique()
+    holiday_dates = set()
+    for year in years:
+        holiday_dates.update(
+            date for date, info in SchoolHolidayDates().holidays_for_year_and_zone(year, 'C').items()
+        )
+    X['is_school_holiday'] = X['date'].dt.date.isin(holiday_dates).astype(int)
+    #X['is_school_holiday'] = X['date'].apply(is_paris_school_holiday)
 
     X = X.drop(columns=['date'])
     return X
@@ -239,8 +252,39 @@ def xgb_vectorized_no_date_encoding(): # best pipeline yet
 
     return pipe
 
+
+def xgb_vectorized_for_optuna(trial=None):
+
+    learning_rate = trial.suggest_float("learning_rate", 0.01, 0.3) if trial else 0.1
+    max_depth = trial.suggest_int("max_depth", 3, 15) if trial else 10
+    n_estimators = trial.suggest_int("n_estimators", 50, 200) if trial else 100
+
+    regressor = XGBRegressor(
+        learning_rate=learning_rate,
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        random_state=42,
+        tree_method='hist',
+        enable_categorical=True,
+    )
+
+    drop_cols = ColumnTransformer(
+        [
+            ('drop_cols', 'drop', columns_to_drop)
+        ],
+        remainder='passthrough'
+    )
+
+    table_vectorizer = TableVectorizer(
+            datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
+            n_jobs=-1
+        )
+
+    pipe = make_pipeline(date_encoder, drop_cols, table_vectorizer, regressor)
+    return pipe
+
 ###############################################################################################################################
-##################################################### GRID SEARCH #############################################################
+##################################################### Optimisation #############################################################
 ###############################################################################################################################
 
 
@@ -258,12 +302,11 @@ def GS_xgb_pipeline():
     
     regressor = XGBRegressor(
         random_state=42,
-        tree_method='hist'  # Utilisation du "histogram method" pour accélérer
+        tree_method='hist'  
     )
     pipe = make_pipeline(merge, date_encoder, preprocessor, regressor)
     return pipe
 
-# Définir le GridSearchCV
 def grid_search(pipe):
     
     grid_search = GridSearchCV(
@@ -276,3 +319,20 @@ def grid_search(pipe):
     )
 
     return grid_search
+
+# Optuna XGBoost
+
+def objective(trial):
+    X, y = get_model_data()
+    
+    X_train, X_valid, y_train, y_valid = train_test_temporal(X, y, delta='30 days')
+    
+    pipeline = xgb_vectorized_for_optuna(trial)
+    
+    pipeline.fit(X_train, y_train)
+    
+    preds = pipeline.predict(X_valid)
+    
+    rmse = np.sqrt(((y_valid - preds) ** 2).mean())
+    return rmse
+
