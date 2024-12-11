@@ -6,8 +6,9 @@ from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardSc
 from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression, Ridge
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
 from sklearn.model_selection import GridSearchCV
+from sklearn.impute import SimpleImputer
 from flaml import AutoML
 from xgboost import XGBRegressor
 from skrub import TableVectorizer, DatetimeEncoder
@@ -113,7 +114,7 @@ def get_model_data(path='data/train.parquet'):
 
     data = pd.read_parquet(path)
     data.sort_values(['date', 'counter_name'], inplace=True)
-    y = data[target_col].values
+    y = data[[target_col]] # .values
     X = data.drop(['bike_count', target_col], axis=1)
 
     return X, y
@@ -128,7 +129,9 @@ def train_test_temporal(X, y, delta='30 days'):
 
     return X_train, X_valid, y_train, y_valid
 
-
+def drop_columns(X):
+    X = X.drop(columns=columns_to_drop, errors='ignore')
+    return X
 
 ###############################################################################################################################
 ################################################## PIPELINE  CONSTRUCTION #####################################################
@@ -160,6 +163,9 @@ preprocessor = ColumnTransformer(
 remainder='passthrough'
 )
 
+imputer = SimpleImputer(missing_values=np.nan, strategy='constant', fill_value=0)
+
+drop_cols_transformer = FunctionTransformer(drop_columns)
 
 #################################################      Pipelines        ######################################################
 
@@ -217,39 +223,11 @@ def xgb_no_encoding():
     pipe = make_pipeline(date_encoder, preprocessor2, regressor)
     return pipe
 
-def xgb_table_vectorized(): # best pipeline yet
-
-    drop_cols = ColumnTransformer(
-        [
-            ('drop_cols', 'drop', columns_to_drop)
-        ],
-        remainder='passthrough'
-    )
-
-    regressor = XGBRegressor( # Modele réduit
-    learning_rate=0.1,
-    n_estimators=100,
-    max_depth=10,
-    random_state=42,
-    tree_method='hist', 
-    enable_categorical=True
-    )
-
-    pipe = make_pipeline(date_encoder, drop_cols, TableVectorizer(), regressor)
-
-    return pipe
-
 
 def xgb_vectorized_no_date_encoding(): # best pipeline yet
 
-    drop_cols = ColumnTransformer(
-        [
-            ('drop_cols', 'drop', columns_to_drop)
-        ],
-        remainder='passthrough'
-    )
-
     table_vectorizer = TableVectorizer(
+        specific_transformers=[(drop_cols_transformer, columns_to_drop)], 
         datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
         n_jobs=-1
     )
@@ -263,7 +241,7 @@ def xgb_vectorized_no_date_encoding(): # best pipeline yet
     enable_categorical=True
     )
 
-    pipe = make_pipeline(merge, date_encoder, drop_cols, table_vectorizer, regressor) # ADDED MERGE
+    pipe = make_pipeline(merge, date_encoder, table_vectorizer, regressor) # ADDED MERGE
 
     return pipe
 
@@ -296,6 +274,27 @@ def xgb_vectorized_for_optuna(trial=None):
         )
 
     pipe = make_pipeline(date_encoder, drop_cols, table_vectorizer, regressor)
+    return pipe
+
+
+def extra_trees():
+
+    drop_cols = ColumnTransformer(
+        [
+            ('drop_cols', 'drop', columns_to_drop)
+        ],
+        remainder='passthrough'
+    )
+
+    table_vectorizer = TableVectorizer(
+        datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
+        n_jobs=-1
+    )
+
+    regressor = ExtraTreesRegressor(n_estimators=100, random_state=42, max_depth=10)
+
+    pipe = make_pipeline(merge, date_encoder, imputer, drop_cols, table_vectorizer, regressor) # ADDED MERGE
+
     return pipe
 
 ###############################################################################################################################
