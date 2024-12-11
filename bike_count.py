@@ -8,7 +8,6 @@ from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LinearRegression, Ridge
 from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
 from sklearn.model_selection import GridSearchCV
-from sklearn.impute import SimpleImputer
 from flaml import AutoML
 from xgboost import XGBRegressor
 from skrub import TableVectorizer, DatetimeEncoder
@@ -99,7 +98,12 @@ def _merge_external_data(X):
 
     df_ext = pd.read_csv(file_path, parse_dates=["date"])
     df_ext['date'] = pd.to_datetime(df_ext['date']).astype('datetime64[us]')
+    
+    for col in ['rr24', 'rr12', 'rr3']:
+        df_ext[col] = np.log1p(df_ext[col])  # log(x + 1)
 
+    df_ext['tend'] = (df_ext['tend'] - df_ext['tend'].mean()) / df_ext['tend'].std()
+    df_ext['pres'] = (df_ext['pres'] - df_ext['pres'].mean()) / df_ext['pres'].std()
     X = X.copy()
     X["orig_index"] = np.arange(X.shape[0])
     X = pd.merge_asof(
@@ -133,6 +137,10 @@ def drop_columns(X):
     X = X.drop(columns=columns_to_drop, errors='ignore')
     return X
 
+def fill_na(X):
+    X = X.fillna(0)
+    return X
+
 ###############################################################################################################################
 ################################################## PIPELINE  CONSTRUCTION #####################################################
 ###############################################################################################################################
@@ -163,9 +171,9 @@ preprocessor = ColumnTransformer(
 remainder='passthrough'
 )
 
-imputer = SimpleImputer(missing_values=np.nan, strategy='constant', fill_value=0)
-
 drop_cols_transformer = FunctionTransformer(drop_columns)
+
+fillna_transformer = FunctionTransformer(fill_na)
 
 #################################################      Pipelines        ######################################################
 
@@ -282,7 +290,7 @@ def extra_trees():
 
     regressor = ExtraTreesRegressor(n_estimators=100, random_state=42, max_depth=10)
 
-    pipe = make_pipeline(merge, date_encoder, table_vectorizer, regressor) # ADDED MERGE
+    pipe = make_pipeline(merge, date_encoder, fillna_transformer, table_vectorizer, regressor) # ADDED MERGE
 
     return pipe
 
