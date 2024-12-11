@@ -13,6 +13,7 @@ from xgboost import XGBRegressor
 from skrub import TableVectorizer, DatetimeEncoder
 import optuna 
 from vacances_scolaires_france import SchoolHolidayDates
+from sklearn.metrics import root_mean_squared_error
 
 
 '''RESUMÉ DE CE QUI MARCHE LE MIEUX
@@ -118,7 +119,7 @@ def get_model_data(path='data/train.parquet'):
 
     data = pd.read_parquet(path)
     data.sort_values(['date', 'counter_name'], inplace=True)
-    y = data[[target_col]] # .values
+    y = data[target_col].values
     X = data.drop(['bike_count', target_col], axis=1)
 
     return X, y
@@ -159,6 +160,13 @@ categorical_encoder = OneHotEncoder(handle_unknown='error')
 
 # Merging Meteorological Data
 merge = FunctionTransformer(_merge_external_data)
+
+table_vectorizer = TableVectorizer(
+        specific_transformers=[(drop_cols_transformer, columns_to_drop)], 
+        datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
+        cardinality_threshold=100,
+        n_jobs=-1
+    )
 
 # Preprocessing steps
 preprocessor = ColumnTransformer(
@@ -241,9 +249,9 @@ def xgb_vectorized_no_date_encoding(): # best pipeline yet
     )
 
     regressor = XGBRegressor( # Modele réduit
-    learning_rate=0.1,
-    n_estimators=100,
-    max_depth=10,
+    learning_rate=0.16878974156327872,
+    n_estimators=139,
+    max_depth=11,
     random_state=42,
     tree_method='hist', 
     enable_categorical=True
@@ -268,14 +276,14 @@ def xgb_vectorized_for_optuna(trial=None):
         tree_method='hist',
         enable_categorical=True,
     )
-
+    '''
     table_vectorizer = TableVectorizer(
         specific_transformers=[(drop_cols_transformer, columns_to_drop)], 
         datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
         n_jobs=-1
     )
-
-    pipe = make_pipeline(date_encoder, table_vectorizer, regressor)
+    '''
+    pipe = make_pipeline(regressor)
     
     return pipe
 
@@ -334,16 +342,22 @@ def grid_search(pipe):
 # Optuna XGBoost
 
 def objective(trial):
-    X, y = get_model_data()
+    param = {
+        'objective': 'reg:squarederror',  # ou 'binary:logistic' pour un problème de classification binaire
+        'eval_metric': 'rmse',  # Pour un problème de régression, ou 'logloss' pour classification
+        'max_depth': trial.suggest_int('max_depth', 8, 15),
+        'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
+        'subsample': trial.suggest_uniform('subsample', 0.5, 1.0),
+        'colsample_bytree': trial.suggest_uniform('colsample_bytree', 0.5, 1.0),
+        'alpha': trial.suggest_loguniform('alpha', 1e-4, 1e-1),  # L2 regularization term
+        'lambda': trial.suggest_loguniform('lambda', 1e-4, 1e-1)  # L1 regularization term
+    }
     
-    X_train, X_valid, y_train, y_valid = train_test_temporal(X, y, delta='30 days')
-    
-    pipeline = xgb_vectorized_for_optuna(trial)
-    
-    pipeline.fit(X_train, y_train)
-    
-    preds = pipeline.predict(X_valid)
-    
-    rmse = np.sqrt(((y_valid - preds) ** 2).mean())
+    model = xgb.XGBRegressor(**param)
+    model.fit(X_train, y_train, eval_set=[(X_val, y_val)], early_stopping_rounds=50, verbose=False)
+
+    y_pred = model.predict(X_val)
+    rmse = root_mean_squared_error(y_val, y_pred)  # ou accuracy_score pour classification
+
     return rmse
 
