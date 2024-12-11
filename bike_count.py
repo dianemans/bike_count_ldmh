@@ -261,39 +261,28 @@ def xgb_vectorized_for_optuna(trial=None):
         enable_categorical=True,
     )
 
-    drop_cols = ColumnTransformer(
-        [
-            ('drop_cols', 'drop', columns_to_drop)
-        ],
-        remainder='passthrough'
+    table_vectorizer = TableVectorizer(
+        specific_transformers=[(drop_cols_transformer, columns_to_drop)], 
+        datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
+        n_jobs=-1
     )
 
-    table_vectorizer = TableVectorizer(
-            datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
-            n_jobs=-1
-        )
-
-    pipe = make_pipeline(date_encoder, drop_cols, table_vectorizer, regressor)
+    pipe = make_pipeline(date_encoder, table_vectorizer, regressor)
+    
     return pipe
 
 
 def extra_trees():
 
-    drop_cols = ColumnTransformer(
-        [
-            ('drop_cols', 'drop', columns_to_drop)
-        ],
-        remainder='passthrough'
-    )
-
     table_vectorizer = TableVectorizer(
+        specific_transformers=[(drop_cols_transformer, columns_to_drop)], 
         datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
         n_jobs=-1
     )
 
     regressor = ExtraTreesRegressor(n_estimators=100, random_state=42, max_depth=10)
 
-    pipe = make_pipeline(merge, date_encoder, imputer, drop_cols, table_vectorizer, regressor) # ADDED MERGE
+    pipe = make_pipeline(merge, date_encoder, table_vectorizer, regressor) # ADDED MERGE
 
     return pipe
 
