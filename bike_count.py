@@ -177,3 +177,13 @@ def xgb_vectorized_for_optuna(trial=None):
     pipe = make_pipeline(regressor)
     
     return pipe
+
+X, y = bc.get_model_data()
+pipe = bc.xgb_vectorized_no_date_encoding()
+pipe.fit(X, y)
+test_data = pd.read_parquet("data/final_test.parquet")
+test_pred = pipe.predict(test_data)
+
+test_df = pd.DataFrame({"Id": range(0, len(test_pred)), "log_bike_count": test_pred})
+
+test_df.to_csv("kaggle_submission.csv", index=False)
