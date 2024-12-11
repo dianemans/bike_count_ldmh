@@ -3,6 +3,7 @@ import numpy as np
 import holidays
 from pathlib import Path
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer
 from xgboost import XGBRegressor
@@ -148,10 +149,19 @@ def xgb_vectorized_no_date_encoding(): # best pipeline yet
 
     #regressor = XGBRegressor(max_depth= 10, min_child_weight= 7, subsample= 0.8972852751497171, colsample_bytree= 0.7366839097750602, reg_alpha= 0.002644395912568715, reg_lambda= 0.00025636265208962237)
     regressor = XGBRegressor(learning_rate=0.1, n_estimators=100, max_depth=10, random_state=42, tree_method='hist', enable_categorical=True)
+    
     pipe = make_pipeline(merge, date_encoder, drop_cols_transformer, table_vectorizer, regressor) # ADDED MERGE
 
     return pipe
 
+def rf_vectorized_no_date_encoding(): # best pipeline yet
+
+    #regressor = XGBRegressor(max_depth= 10, min_child_weight= 7, subsample= 0.8972852751497171, colsample_bytree= 0.7366839097750602, reg_alpha= 0.002644395912568715, reg_lambda= 0.00025636265208962237)
+    regressor = RandomForestRegressor(max_depth=10, random_state=42)
+    
+    pipe = make_pipeline(merge, date_encoder, drop_cols_transformer, table_vectorizer, regressor) # ADDED MERGE
+
+    return pipe
 
 def xgb_vectorized_for_optuna(trial=None):
 
@@ -167,23 +177,17 @@ def xgb_vectorized_for_optuna(trial=None):
         tree_method='hist',
         enable_categorical=True,
     )
-    '''
-    table_vectorizer = TableVectorizer(
-        specific_transformers=[(drop_cols_transformer, columns_to_drop)], 
-        datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
-        n_jobs=-1
-    )
-    '''
+
     pipe = make_pipeline(regressor)
     
     return pipe
 
-X, y = bc.get_model_data()
-pipe = bc.xgb_vectorized_no_date_encoding()
+X, y = get_model_data()
+pipe = xgb_vectorized_no_date_encoding()
 pipe.fit(X, y)
 test_data = pd.read_parquet("data/final_test.parquet")
 test_pred = pipe.predict(test_data)
 
 test_df = pd.DataFrame({"Id": range(0, len(test_pred)), "log_bike_count": test_pred})
 
-test_df.to_csv("kaggle_submission.csv", index=False)
+test_df.to_csv("submission.csv", index=False)
