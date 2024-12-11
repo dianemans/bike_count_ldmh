@@ -161,6 +161,8 @@ categorical_encoder = OneHotEncoder(handle_unknown='error')
 # Merging Meteorological Data
 merge = FunctionTransformer(_merge_external_data)
 
+drop_cols_transformer = FunctionTransformer(drop_columns)
+
 table_vectorizer = TableVectorizer(
         specific_transformers=[(drop_cols_transformer, columns_to_drop)], 
         datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
@@ -179,7 +181,6 @@ preprocessor = ColumnTransformer(
 remainder='passthrough'
 )
 
-drop_cols_transformer = FunctionTransformer(drop_columns)
 
 fillna_transformer = FunctionTransformer(fill_na)
 
@@ -245,17 +246,11 @@ def xgb_vectorized_no_date_encoding(): # best pipeline yet
     table_vectorizer = TableVectorizer(
         specific_transformers=[(drop_cols_transformer, columns_to_drop)], 
         datetime=DatetimeEncoder(resolution='month', add_total_seconds=False),
+        cardinality_threshold=100,
         n_jobs=-1
     )
 
-    regressor = XGBRegressor( # Modele réduit
-    learning_rate=0.16878974156327872,
-    n_estimators=139,
-    max_depth=11,
-    random_state=42,
-    tree_method='hist', 
-    enable_categorical=True
-    )
+    regressor = XGBRegressor(max_depth= 10, min_child_weight= 7, subsample= 0.8972852751497171, colsample_bytree= 0.7366839097750602, reg_alpha= 0.002644395912568715, reg_lambda= 0.00025636265208962237)
 
     pipe = make_pipeline(merge, date_encoder, table_vectorizer, regressor) # ADDED MERGE
 
