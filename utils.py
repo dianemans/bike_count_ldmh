@@ -4,6 +4,7 @@ from pathlib import Path
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder
 from sklearn.pipeline import make_pipeline
 from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import TimeSeriesSplit
 from xgboost import XGBRegressor
 from skrub import TableVectorizer, DatetimeEncoder, GapEncoder
 
