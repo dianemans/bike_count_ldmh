@@ -1,23 +1,21 @@
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from sklearn.preprocessing import FunctionTransformer, OneHotEncoder
-from sklearn.pipeline import make_pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.model_selection import TimeSeriesSplit
-from xgboost import XGBRegressor
-from skrub import TableVectorizer, DatetimeEncoder, GapEncoder
 
 # Import of bank holidays (jours fériés) in France
 # Source : https://pypi.org/project/holidays/
 # Licence : MIT License (MIT)
 import holidays
-
+import numpy as np
+import pandas as pd
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import FunctionTransformer, OneHotEncoder
+from skrub import DatetimeEncoder, GapEncoder, TableVectorizer
 # Import of school holidays by zone in france
 # Source : https://pypi.org/project/vacances-scolaires-france/
 # Licence : MIT License (MIT)
 from vacances_scolaires_france import SchoolHolidayDates
-
+from xgboost import XGBRegressor
 
 target_col = "log_bike_count"
 
@@ -98,7 +96,7 @@ def _merge_external_data(X):
     return X
 
 
-def get_model_data(path='data/train.parquet'):
+def get_model_data(path="data/train.parquet"):
 
     data = pd.read_parquet(path)
     data.sort_values(["date", "counter_name"], inplace=True)

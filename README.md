@@ -1,48 +1,50 @@
-# Starting kit on the bike counters dataset
+# Kaggle Challenge: Predicting Cyclist Traffic in Paris
 
-Read the instruction from the [Kaggle challenge](https://www.kaggle.com/competitions/mdsb-2023/overview).
+This repository contains all the code, data, and documentation for our participation in the Kaggle competition *Predicting Cyclist Traffic in Paris*. The objective is to forecast the number of cyclists at various locations across Paris based on temporal and external data.
 
-### Download the data
+---
 
-Download the data from Kaggle and put the files into the `data` folder.
+## Table of Contents
 
-Note that your goal is to train your model on `train.parquet` (and eventual external datasets)
-and then make predictions on `final_test.parquet`.
+- [Project Overview](#project-overview)
+- [Repository Structure](#repository-structure)
+- [Key Features](#key-features)
+- [Requirements](#requirements)
+- [Usage](#usage)
+- [Results](#results)
+- [Future Work](#future-work)
+- [Contributors](#contributors)
 
-### Install the local environment
+---
 
-To run the notebook locally you will need the dependencies listed
-in `requirements.txt`. 
+## Project Overview
 
-It is recommended to create a new virtual environement for this project. For instance, with conda,
-```bash
-conda create -n bikes-count python=3.10
-conda activate bikes-count
-```
+Cyclist traffic in Paris is influenced by a variety of factors, including time of year, weather conditions, holidays, and external disruptions like the COVID-19 pandemic. Our analysis and models aim to capture these influences to accurately predict bike traffic.
 
-You can install the dependencies with the following command-line:
+### Highlights:
+- *Dataset*: Hourly bike counts from 30 counters in Paris (September 2020 to September 2021).
+- *Features*: Includes weather data, holidays, and COVID-19 measures.
+- *Models Tested*:
+  - Linear Regression (baseline)
+  - Facebook Prophet (time-series)
+  - XGBoost (tree-based, best performer)
+- *Evaluation Metric*: Root Mean Square Error (RMSE).
 
-```bash
-pip install -r requirements.txt -U
-```
+---
 
-### The starter notebook
+## Repository Structure
 
-Get started on this challenge with the `bike_counters_starting_kit.ipynb` notebook.
-This notebook is just a helper to show you different methods and ideas useful for your
-exploratory notebooks and your submission script.
-
-Launch the notebook using:
-
-```bash
-jupyter lab bike_counters_starting_kit.ipynb
-```
-
-### Submissions
-
-Upload your script file `.py` to Kaggle using the Kaggle interface directly.
-The platform will then execute your code to generate your submission csv file,
-and compute your score.
-
-Note that your submission .csv file must have the columns "Id" and "bike_log_count",
-and be of the same length as `final_test.parquet`.
+```plaintext
+.
+├── data/                      # Raw and processed datasets
+├── external_data/             # External data sources (e.g., weather, holidays)
+├── eda.ipynb                  # Exploratory Data Analysis
+├── crossval.ipynb             # Cross-validation experiments
+├── optuna.ipynb               # Hyperparameter tuning
+├── prophet.ipynb              # Prophet experiments
+├── mainfile.py                # Main script for predictions
+├── utils.py                   # Utility functions (encoding, preprocessing, pipeline)
+├── models.pkl                 # Models from the Prophet experiments
+├── requirements.txt           # Dependencies
+├── README.md                  # Project documentation (this file)
+└── pictures/                  # Generated plots and figures
