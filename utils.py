@@ -11,6 +11,7 @@ from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder
 from skrub import DatetimeEncoder, GapEncoder, TableVectorizer
+
 # Import of school holidays by zone in france
 # Source : https://pypi.org/project/vacances-scolaires-france/
 # Licence : MIT License (MIT)
